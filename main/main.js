@@ -345,7 +345,7 @@ const axios = require('axios');
 const AI_BASE_URL = 'http://127.0.0.1:8000';
 
 async function postToAI(path, body) {
-  const res = await axios.post(`${AI_BASE_URL}${path}`, body, { timeout: 60000 });
+  const res = await axios.post(`${AI_BASE_URL}${path}`, body, { timeout: 180000 });
   return res.data;
 }
 

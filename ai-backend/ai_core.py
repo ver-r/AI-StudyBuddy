@@ -88,29 +88,51 @@ def _safe_groq_call(
     model: str = "llama-3.1-8b-instant",
     context: Optional[str] = None,
     max_completion_tokens: int = 1024,
-    temperature: float = 0.2
+    temperature: float = 0.2,
+    retries: int = 4,
+    delay: float = 2.0
 ) -> str:
-    try:
-        if context:
-            context_msg = {
-                "role": "system",
-                "content": (
-                    "ONLY use the provided CONTEXT to answer the user's requests. "
-                    "If the answer is not in the context, say: \"I can't find that in your notes.\" "
-                    "CONTEXT START:\n\n" + context + "\n\nCONTEXT END"
-                )
-            }
-            messages = [context_msg] + messages
+    for attempt in range(retries):
+        try:
+            if context:
+                context_msg = {
+                    "role": "system",
+                    "content": (
+                        "ONLY use the provided CONTEXT to answer the user's requests. "
+                        "If the answer is not in the context, say: \"I can't find that in your notes.\" "
+                        "CONTEXT START:\n\n" + context + "\n\nCONTEXT END"
+                    )
+                }
+                messages = [context_msg] + messages
 
-        completion = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_completion_tokens=max_completion_tokens,
-            temperature=temperature,
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        return f"ERROR_IN_GROQ: {str(e)}"
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_completion_tokens=max_completion_tokens,
+                temperature=temperature,
+            )
+
+            return completion.choices[0].message.content
+        
+        except Exception as e:
+            if attempt == retries - 1:
+                return f"ERROR_IN_GROQ: {str(e)}"
+            time.sleep(delay)  
+# --- RATE LIMIT PROTECTION ---
+import time
+GROQ_API_DELAY = 1.2  # seconds between Groq API calls
+
+def safe_groq(messages, context=None, model="llama-3.1-8b-instant",
+              max_completion_tokens=512, temperature=0.2):
+    result = _safe_groq_call(
+        messages=messages,
+        context=context,
+        model=model,
+        max_completion_tokens=max_completion_tokens,
+        temperature=temperature
+    )
+    time.sleep(GROQ_API_DELAY)  # prevent rate-limit timeout
+    return result
 
 # --------- VECTORSTORE HELPERS ----------
 def fetch_all_documents_from_chroma() -> List[str]:
@@ -135,7 +157,7 @@ def fetch_all_documents_from_chroma() -> List[str]:
 
     return []
 
-def retrieve_context_for_topic(topic: str, k: int = 6) -> List[str]:
+def retrieve_context_for_topic(topic: str, k: int = 3) -> List[str]:
     try:
         docs = vector_store.similarity_search(topic, k=k)
         return [d.page_content for d in docs]
@@ -182,7 +204,8 @@ Context:
 (Use only the context to generate the question.)
 """
     messages = [{"role": "user", "content": prompt_user}]
-    return _safe_groq_call(messages=messages, context=context, temperature=0.2, max_completion_tokens=512)
+    #return _safe_groq_call(messages=messages, context=context, temperature=0.2, max_completion_tokens=512)
+    return safe_groq(messages=messages, context=context, temperature=0.2, max_completion_tokens=256)
 
 def parse_question_response(response: str) -> dict:
     q = {"question": "", "a": "", "b": "", "c": "", "d": "", "correct": ""}
@@ -276,7 +299,8 @@ User Question: {question}
 Answer in 2-4 sentences and, when helpful, give one brief supporting detail or example.
 """
     messages = [{"role": "user", "content": prompt}]
-    return _safe_groq_call(messages=messages, context=context, temperature=0.2, max_completion_tokens=512)
+   # return _safe_groq_call(messages=messages, context=context, temperature=0.2, max_completion_tokens=512)
+    return safe_groq(messages=messages, context=context, temperature=0.2, max_completion_tokens=512)
 
 # --------- SUMMARIZER ----------
 def summarize_notes(mode: str = "Detailed") -> str:
