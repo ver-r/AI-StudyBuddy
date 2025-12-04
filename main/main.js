@@ -375,13 +375,39 @@ ipcMain.handle('ai:doubt', async (_evt, { question, lastAnswer }) => {
 
 ipcMain.handle('ai:summarize', async (_evt, { mode }) => {
   try {
-    const data = await postToAI('/summarize', { mode: mode || 'Detailed' });
-    return { ok: true, data };
+    // Step 1: Start the summarization job
+    const startRes = await axios.post(`${AI_BASE_URL}/summarize/start`, {
+      mode: mode || 'Detailed'
+    });
+    const jobId = startRes.data.job_id;
+
+    console.log('[MAIN] Summary started, Job ID:', jobId);
+
+    // Step 2: Poll until summary is done
+    while (true) {
+      const statusRes = await axios.get(`${AI_BASE_URL}/summarize/status/${jobId}`);
+      const statusData = statusRes.data;
+
+      if (statusData.status === 'done') {
+        console.log('[MAIN] Summary complete');
+        return { ok: true, summary: statusData.summary };
+      }
+
+      if (statusData.status === 'error') {
+        console.error('[MAIN] Summary failed:', statusData.error);
+        return { ok: false, error: statusData.error };
+      }
+
+      // still processing → wait 3 seconds
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
   } catch (err) {
-    console.error('ai:summarize error', err);
+    console.error('[MAIN] ai:summarize error', err);
     return { ok: false, error: String(err.message || err) };
   }
 });
+
 
 ipcMain.handle('ai:ingest', async () => {
   try {

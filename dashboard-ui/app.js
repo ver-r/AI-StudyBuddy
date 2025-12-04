@@ -913,19 +913,34 @@ function wireAI(){
     resultBox.textContent = '';
 
     try {
-      const res = await window.electronAPI.ai.summarize(mode);
-      console.log('ai:summarize result', res);
-      if (!res || !res.ok || res.data?.ok === false) {
-        showError(res?.error || res?.data?.error || 'Summary failed.');
-        return;
-      }
+  const res = await window.electronAPI.ai.summarize(mode);
+  console.log('ai:summarize result', res);
 
-      resultBox.textContent = res.data.summary || '';
-      setStatus(`Summary ready (${mode}).`);
-    } catch (err) {
-      console.error('ai:summarize error', err);
-      showError(String(err));
-    }
+  if (!res || !res.ok) {
+    showError(res?.error || "Summary failed.");
+    return;
+  }
+
+  // Summary is ready immediately
+  if (res.summary) {
+    resultBox.textContent = res.summary;
+    setStatus(`Summary ready (${mode}).`);
+    return;
+  }
+
+  // Summary not ready yet, background processing
+  if (res.jobId) {
+    setStatus("Summarizing… (still processing)");
+    resultBox.textContent = "(Working in background…)";
+    return;
+  }
+
+  showError("Unexpected response format.");
+} catch (err) {
+  console.error('ai:summarize error', err);
+  showError(String(err));
+}
+
   });
 }
 

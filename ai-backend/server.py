@@ -1,9 +1,11 @@
 # server.py
 import os
 from typing import List, Optional
-
+import uuid
+import threading
 from fastapi import FastAPI
 from pydantic import BaseModel
+jobs = {}
 
 from ai_core import (
     generate_question_rag,
@@ -30,6 +32,14 @@ class SummaryRequest(BaseModel):
 
 class IngestRequest(BaseModel):
     path : str
+    
+def run_summary(job_id: str, mode: str):
+    try:
+        result = summarize_notes(mode)
+        jobs[job_id] = {"status": "done", "result": result}
+    except Exception as e:
+        jobs[job_id] = {"status": "error", "result": str(e)}
+
 
 @app.get("/health")
 def health():
@@ -72,11 +82,30 @@ def doubt(req: DoubtRequest):
     answer = solve_doubt(req.question, last_answer=req.last_answer or "")
     return {"ok": True, "answer": answer}
 
-@app.post("/summarize")
-def summarize(req: SummaryRequest):
+@app.post("/summarize/start")
+def summarize_start(req: SummaryRequest):
     mode = "Brief" if req.mode.lower().startswith("brief") else "Detailed"
-    text = summarize_notes(mode=mode)
-    return {"ok": True, "summary": text}
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {"status": "processing", "result": ""}
+
+    t = threading.Thread(target=run_summary, args=(job_id, mode))
+    t.start()
+
+    return {"ok": True, "job_id": job_id}
+@app.get("/summarize/status/{job_id}")
+def summarize_status(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        return {"ok": False, "error": "Invalid job_id"}
+
+    if job["status"] == "done":
+        return {"ok": True, "status": "done", "summary": job["result"]}
+
+    if job["status"] == "error":
+        return {"ok": False, "status": "error", "error": job["result"]}
+
+    return {"ok": True, "status": "processing"}
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("AI_PORT", "8000"))

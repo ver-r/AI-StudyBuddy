@@ -41,24 +41,42 @@ import os
 # ... existing GROQ / embeddings / vector_store setup ...
 
 def ingest_pdf(path: str) -> int:
-    """
-    Load a PDF from disk, split into pages, and add page texts
-    into the existing Chroma vector_store.
-
-    Returns number of pages ingested.
-    """
     if not os.path.exists(path):
         raise FileNotFoundError(f"PDF not found: {path}")
 
     loader = PyPDFLoader(path)
-    docs = loader.load()  # list of Documents, one per page (for PyPDFLoader)
+    docs = loader.load()
 
-    texts = [d.page_content for d in docs]
-    metadatas = [{"source": path, "page": i} for i in range(len(texts))]
+    added_count = 0
 
-    # let Chroma generate IDs automatically
-    vector_store.add_texts(texts=texts, metadatas=metadatas)
-    return len(texts)
+    for i, d in enumerate(docs):
+        text = d.page_content.strip()
+        if not text:
+            continue
+
+        doc_hash = hash_text(text)
+
+        # If hash exists → skip
+        search = vector_store._collection.get(
+            where={"doc_hash": doc_hash},
+            include=["metadatas"]
+        )
+        if search and search.get("metadatas"):
+            continue
+
+        vector_store.add_texts(
+            texts=[text],
+            metadatas=[{
+                "source": os.path.basename(path),
+                "page": i,
+                "doc_hash": doc_hash
+            }],
+        )
+        added_count += 1
+
+    vector_store.persist()
+    return added_count
+
 
 
 # --------- HELPERS ----------
@@ -115,11 +133,7 @@ def fetch_all_documents_from_chroma() -> List[str]:
     except Exception:
         pass
 
-    try:
-        docs = vector_store.similarity_search(" ", k=1000)
-        return [d.page_content for d in docs]
-    except Exception:
-        return []
+    return []
 
 def retrieve_context_for_topic(topic: str, k: int = 6) -> List[str]:
     try:
@@ -267,12 +281,17 @@ Answer in 2-4 sentences and, when helpful, give one brief supporting detail or e
 # --------- SUMMARIZER ----------
 def summarize_notes(mode: str = "Detailed") -> str:
     docs_texts = fetch_all_documents_from_chroma()
+    
     if not docs_texts:
         return "No notes found in the database."
-
+    if mode.lower().startswith("brief"):
+        MAX_DOCS=12
+    else:
+        MAX_DOCS=25
+    docs_texts = docs_texts[:MAX_DOCS]
     full_text = "\n\n".join(docs_texts)
 
-    max_chunk_chars = 4000
+    max_chunk_chars =6000
     chunks: list[str] = []
     text = full_text
 
@@ -294,7 +313,7 @@ Text:
 """
         summary = _safe_groq_call(
             messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=500,
+            max_completion_tokens=300,
             temperature=0.2
         )
         chunk_summaries.append(f"Chunk {i+1} Summary:\n{summary}")

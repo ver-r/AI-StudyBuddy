@@ -33,7 +33,7 @@ embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-
 vector_store = Chroma(
     collection_name="nsc",               # your collection name
     embedding_function=embeddings,
-    persist_directory="./chroma_db"
+    persist_directory="E:\AI-StudyBuddy\chroma_db"
 )
 
 # -------------------------
