@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>StudyBuddy — Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- This file defines the app shell (sidebar + header + content). -->
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- Sidebar: primary navigation -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="buddy-dot"></div>
+          <span>StudyBuddy</span>
+        </div>
+        <nav class="nav">
+          <!-- data-route keys must match section IDs below -->
+          <button class="nav-item is-active" data-route="today">☀️ Today</button>
+          <button class="nav-item" data-route="tasks">✅ Tasks</button>
+          <button class="nav-item" data-route="plan">📅 Plan</button>
+          <button class="nav-item" data-route="settings">⚙️ Settings</button>
+          <!-- add inside .sidebar, near .sidebar-foot or where other controls exist -->
+          <div
+            class="sidebar-actions"
+            style="
+              margin-top: auto;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+            "
+          >
+            <button
+              id="btnChatbot"
+              class="nav-item"
+              data-route="ai"
+              style="display: flex; align-items: center; gap: 8px"
+            >
+              🤖 Chatbot
+            </button>
+
+            <button
+              id="btnEmotion"
+              class="nav-item"
+              style="display: flex; align-items: center; gap: 8px"
+            >
+              📸 Emotion (Webcam)
+            </button>
+
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: var(--muted);
+                font-size: 12px;
+              "
+            >
+              <input id="chkEmotionConsent" type="checkbox" /> Allow Emotion
+              Detection
+            </label>
+          </div>
+        </nav>
+        <div class="sidebar-foot">
+          <small>v0.1</small>
+        </div>
+      </aside>
+
+      <!-- Main content area -->
+      <main class="content">
+        <header class="topbar">
+          <div class="left">
+            <h1 class="title">Hi, I’m StudyBuddy</h1>
+            <div class="date" id="todayDate"></div>
+          </div>
+          <div class="right">
+            <button class="btn ghost" id="themeToggle" title="Toggle theme">
+              🌙/☀️
+            </button>
+            <button
+              class="btn ghost"
+              id="quickAddBtn"
+              title="Quick add (Ctrl/Cmd+K)"
+            >
+              ✚ Quick Add
+            </button>
+            <button class="btn ghost" title="Notifications">🔔</button>
+            <button class="btn ghost" title="Help">❔</button>
+          </div>
+        </header>
+
+        <!-- ROUTES: one section per route. Only one visible at a time. -->
+
+        <!-- Today (Focus) -->
+        <section id="route-today" class="route is-visible">
+          <div class="grid">
+            <div class="card timer">
+              <div class="timer-head">
+                <span class="chip idle" id="sessionState">Idle</span>
+                <div class="presets">
+                  <button class="chip-btn" data-preset="25/5/15/4">25/5</button>
+                  <button class="chip-btn" data-preset="50/10/20/4">
+                    50/10
+                  </button>
+                </div>
+              </div>
+              <div class="timer-face" id="timerFace">25:00</div>
+              <div class="timer-adjust">
+                <button class="btn small ghost" id="dec1" title="–1 minute">
+                  –1
+                </button>
+                <button class="btn small ghost" id="inc1" title="+1 minute">
+                  +1
+                </button>
+                <button class="btn small ghost" id="dec5" title="–5 minutes">
+                  –5
+                </button>
+                <button class="btn small ghost" id="inc5" title="+5 minutes">
+                  +5
+                </button>
+                <button
+                  class="btn small"
+                  id="saveDefault"
+                  title="Make this the default"
+                >
+                  Save default
+                </button>
+              </div>
+
+              <!-- hidden inline editor shown on double-click -->
+              <input
+                id="editMinutes"
+                class="timer-edit"
+                type="number"
+                min="1"
+                max="180"
+                step="1"
+                placeholder="minutes"
+              />
+
+              <div class="timer-ctas">
+                <button class="btn primary" id="btnStart">Start</button>
+                <button class="btn" id="btnPause" disabled>Pause</button>
+                <button class="btn" id="btnStop" disabled>Stop</button>
+                <button class="btn ghost" id="btnSkip" disabled>
+                  Skip Break
+                </button>
+              </div>
+              <div class="timer-stats">
+                <div>
+                  <strong id="statSessions">0</strong
+                  ><span>Sessions today</span>
+                </div>
+                <div>
+                  <strong id="statMinutes">0</strong><span>Focus mins</span>
+                </div>
+                <div>
+                  <strong id="statStreak">0</strong><span>Day streak</span>
+                </div>
+                <div>
+                  <strong id="statBestStreak">0</strong><span>Best Streak</span>
+                </div>
+              </div>
+              <details class="log" id="logWrap">
+                <summary>Session history</summary>
+                <ul class="list" id="sessionLog">
+                  <li class="empty">No sessions yet.</li>
+                </ul>
+              </details>
+            </div>
+
+            <div class="card tasks-today">
+              <div class="section-head">
+                <h2>Tasks Due Today</h2>
+                <button
+                  class="btn small ghost"
+                  id="dueViewAll"
+                  data-route-jump="tasks"
+                >
+                  View all →
+                </button>
+              </div>
+              <ul class="list" id="dueTodayList">
+                <li class="empty">No due tasks today. Add one below.</li>
+              </ul>
+
+              <div class="quick-add">
+                <input id="quickTaskTitle" placeholder="Quick add a task…" />
+                <input id="quickTaskDue" type="date" />
+                <button class="btn small" id="quickTaskAdd">Add</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tasks -->
+        <section id="route-tasks" class="route">
+          <div class="card">
+            <div class="section-head">
+              <h2>Tasks</h2>
+            </div>
+
+            <div class="task-add">
+              <input id="taskTitle" placeholder="Task title…" />
+              <input id="taskDue" type="date" />
+              <select id="taskPriority" title="Priority">
+                <option value="">Priority</option>
+                <option value="high">High</option>
+                <option value="med">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <button class="btn" id="taskAdd">Add</button>
+            </div>
+
+            <div class="task-toolbar">
+              <div class="filters">
+                <button class="chip-btn is-active" data-filter="all">
+                  All
+                </button>
+                <button class="chip-btn" data-filter="active">Active</button>
+                <button class="chip-btn" data-filter="done">Done</button>
+                <button class="chip-btn" data-filter="today">Due Today</button>
+                <button class="chip-btn" data-filter="overdue">Overdue</button>
+              </div>
+              <div class="sorts">
+                <label>Sort:</label>
+                <select id="taskSort">
+                  <option value="manual">Manual</option>
+                  <option value="priority">Priority</option>
+                  <option value="due">Due date</option>
+                </select>
+              </div>
+            </div>
+
+            <ul class="list" id="taskList">
+              <li class="empty">No tasks yet. Add your first one above.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Plan -->
+        <section id="route-plan" class="route">
+          <div class="card">
+            <div class="section-head">
+              <h2>Plan a session</h2>
+            </div>
+            <div class="plan-form">
+              <input id="planDate" type="date" />
+              <input id="planTime" type="time" />
+              <input
+                id="planDuration"
+                type="number"
+                min="5"
+                step="5"
+                placeholder="Duration (min)"
+              />
+              <input id="planNote" placeholder="Optional note" />
+              <button class="btn" id="planAdd">Add</button>
+              <button
+                class="btn ghost"
+                id="planAddGCal"
+                title="(v1.1) Add to Google Calendar"
+              >
+                Add to Google Calendar
+              </button>
+            </div>
+
+            <div class="section-head">
+              <h3>Upcoming</h3>
+            </div>
+            <ul class="list" id="planList">
+              <li class="empty">No upcoming sessions.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- AI / Chatbot -->
+<section id="route-ai" class="route">
+  <div class="grid">
+    <!-- Left: PDFs & controls -->
+    <div class="card">
+      <div class="section-head">
+        <h2>AI StudyBuddy</h2>
+        <button class="btn small ghost" id="aiAddPdfBtn">
+          + Add PDF notes
+        </button>
+      </div>
+
+      <p class="muted">
+        Add your PDFs; StudyBuddy will use them to generate quizzes, summaries
+        and answer doubts. Everything stays on your device.
+      </p>
+
+      <!-- List of ingested PDFs -->
+      <h3 style="margin-top:16px; font-size:14px;">Your notes</h3>
+      <ul class="list" id="aiPdfList">
+        <li class="empty">No PDFs added yet. Click “Add PDF notes”.</li>
+      </ul>
+
+      <hr style="margin:16px 0; border-color:var(--border-strong); opacity:0.4;" />
+
+      <!-- Quiz controls -->
+      <h3 style="margin-top:0; font-size:14px;">Quiz generator</h3>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <input
+          id="aiTopic"
+          placeholder="Topic (e.g. IPsec, Diffie–Hellman, RSA)…"
+        />
+        <div style="display:flex; gap:8px;">
+          <select id="aiDifficulty" style="flex:1;">
+            <option value="Easy">Easy</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="Hard">Hard</option>
+          </select>
+          <input
+            id="aiNumQuestions"
+            type="number"
+            min="1"
+            max="15"
+            value="5"
+            style="width:80px;"
+          />
+          <button class="btn small" id="aiQuizBtn">Generate quiz</button>
+        </div>
+      </div>
+
+      <hr style="margin:16px 0; border-color:var(--border-strong); opacity:0.4;" />
+
+      <!-- Doubt solver controls -->
+      <h3 style="margin-top:0; font-size:14px;">Ask a doubt</h3>
+      <textarea
+        id="aiQuestionInput"
+        rows="3"
+        placeholder="Ask a question from your notes…"
+        style="resize:vertical;"
+      ></textarea>
+      <button class="btn small" id="aiAskBtn" style="margin-top:8px;">
+        Ask
+      </button>
+
+      <hr style="margin:16px 0; border-color:var(--border-strong); opacity:0.4;" />
+
+      <!-- Summary controls -->
+      <h3 style="margin-top:0; font-size:14px;">Summarize notes</h3>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <select id="aiSummaryMode" style="flex:1;">
+          <option value="Brief">Brief</option>
+          <option value="Detailed" selected>Detailed</option>
+        </select>
+        <button class="btn small" id="aiSummarizeBtn">Summarize</button>
+      </div>
+    </div>
+
+    <!-- Right: Result panel -->
+    <div class="card">
+      <h2>Result</h2>
+      <div id="aiStatus" class="muted" style="min-height:18px; margin-bottom:8px;"></div>
+      <div
+        id="aiResult"
+        style="
+          border-radius: 10px;
+          border: 1px solid var(--border-strong);
+          background: var(--surface-2);
+          padding: 12px;
+          min-height: 220px;
+          white-space: pre-wrap;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+          font-size: 13px;
+        "
+      >
+        Select a feature on the left to see output here.
+      </div>
+    </div>
+  </div>
+</section>
+
+
+        <!-- Settings -->
+        <section id="route-settings" class="route">
+          <div class="card">
+            <div class="section-head"><h2>Settings</h2></div>
+
+            <div class="settings-grid">
+              <div class="group">
+                <h3>Timer</h3>
+                <div class="row">
+                  <label>Focus (min)</label
+                  ><input
+                    id="setFocus"
+                    type="number"
+                    min="5"
+                    step="5"
+                    value="25"
+                  />
+                </div>
+                <div class="row">
+                  <label>Short break (min)</label
+                  ><input
+                    id="setShort"
+                    type="number"
+                    min="3"
+                    step="1"
+                    value="5"
+                  />
+                </div>
+                <div class="row">
+                  <label>Long break (min)</label
+                  ><input
+                    id="setLong"
+                    type="number"
+                    min="5"
+                    step="5"
+                    value="15"
+                  />
+                </div>
+                <div class="row">
+                  <label>Long break every</label
+                  ><input
+                    id="setEvery"
+                    type="number"
+                    min="2"
+                    step="1"
+                    value="4"
+                  />
+                </div>
+              </div>
+
+              <div class="group">
+                <h3>Theme</h3>
+                <div class="row">
+                  <label>Mode</label>
+                  <select id="setTheme">
+                    <option value="system">System</option>
+                    <option value="dark" selected>Dark</option>
+                    <option value="light">Light</option>
+                  </select>
+                </div>
+                <div class="row">
+                  <label>Accent</label>
+                  <input id="setAccent" type="color" value="#8B7CFB" />
+                </div>
+              </div>
+
+              <div class="card" id="gcalCard" style="margin-top: 16px">
+                <h3 style="margin-top: 0">Integrations</h3>
+                <div style="display: flex; align-items: center; gap: 12px">
+                  <div>
+                    <div><strong>Google Calendar</strong></div>
+                    <div id="gcalStatus" class="muted">Not connected</div>
+                  </div>
+                  <div style="margin-left: auto; display: flex; gap: 8px">
+                    <button class="btn" id="gcalConnect">Connect</button>
+                    <button
+                      class="btn ghost"
+                      id="gcalDisconnect"
+                      style="display: none"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="group">
+                <h3>Buddy</h3>
+                <div class="row">
+                  <label>Size</label>
+                  <select id="setBuddySize">
+                    <option>Small</option>
+                    <option selected>Medium</option>
+                    <option>Large</option>
+                  </select>
+                </div>
+                <div class="row">
+                  <label>Click-through</label>
+                  <input type="checkbox" id="setClickThrough" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+                <!-- Chatbot / AI StudyBuddy -->
+        <section id="route-chatbot" class="route">
+          <div class="card">
+            <div class="section-head">
+              <h2>AI StudyBuddy</h2>
+                <button class="btn small ghost" id="aiAddPdfBtn">
+                  + Add PDF notes                 
+                </button>
+            </div>
+
+            <div class="ai-layout">
+              <div class="ai-left">
+                <h3 style="margin-bottom:4px;">Topic Quiz</h3>
+                <div class="ai-group">
+                  <label for="aiTopic">Topic</label>
+                  <input
+                    id="aiTopic"
+                    placeholder="e.g. Diffie–Hellman key exchange"
+                  />
+                </div>
+
+                <div class="ai-row">
+                  <div class="ai-group">
+                    <label for="aiDifficulty">Difficulty</label>
+                    <select id="aiDifficulty">
+                      <option value="Easy">Easy</option>
+                      <option value="Medium" selected>Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
+                  <div class="ai-group">
+                    <label for="aiNumQuestions">Questions</label>
+                    <input
+                      id="aiNumQuestions"
+                      type="number"
+                      min="1"
+                      max="15"
+                      value="5"
+                    />
+                  </div>
+                </div>
+
+                <button class="btn small" id="aiQuizBtn">
+                  Generate quiz
+                </button>
+
+                <hr class="ai-divider" />
+
+                <h3 style="margin-bottom:4px;">Doubt Solver</h3>
+                <div class="ai-row">
+                  <input
+                    id="aiQuestionInput"
+                    placeholder="Ask a doubt about your notes…"
+                  />
+                  <button class="btn small" id="aiAskBtn">Ask</button>
+                </div>
+
+                <hr class="ai-divider" />
+
+                <h3 style="margin-bottom:4px;">Summarize Notes</h3>
+                <div class="ai-row">
+                  <select id="aiSummaryMode">
+                    <option value="Brief">Brief</option>
+                    <option value="Detailed" selected>Detailed</option>
+                  </select>
+                  <button class="btn small" id="aiSummarizeBtn">
+                    Summarize
+                  </button>
+                </div>
+
+                <div
+                  id="aiStatus"
+                  class="muted"
+                  style="margin-top: 8px; font-size: 12px"
+                ></div>
+              </div>
+
+              <div class="ai-right">
+                <h3 style="margin-top:0;">Result</h3>
+                <pre id="aiResult" class="ai-result-box"></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
