@@ -369,12 +369,13 @@ ipcMain.handle('ai:doubt', async (_evt, { question, lastAnswer }) => {
   }
 });
 
-ipcMain.handle('ai:summarize', async (_evt, { mode }) => {
+ipcMain.handle('ai:summarize', async (_evt, { mode, source  }) => {
   try {
     // Step 1: Start the summarization job
     const startRes = await axios.post(`${AI_BASE_URL}/summarize/start`, {
-      mode: mode || 'Detailed'
-    });
+  mode: mode || 'Detailed',
+  source: source || null
+});
     const jobId = startRes.data.job_id;
 
     console.log('[MAIN] Summary started, Job ID:', jobId);

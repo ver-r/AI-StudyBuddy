@@ -1530,7 +1530,7 @@ function wireAI(){
 
     // figure out which PDF to summarize
     const selected = state.ai.selectedPdf;
-    let sourcePath = selected ? selected.path : null;
+    let sourcePath = selected ? selected.name: null;
 
     if (!sourcePath) {
       const ok = confirm('No specific note selected. Summarize ALL notes instead?');

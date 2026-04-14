@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   doubt:     (question, lastAnswer) =>
     ipcRenderer.invoke('ai:doubt', { question, lastAnswer }),
   summarize: (mode) =>
-    ipcRenderer.invoke('ai:summarize', { mode }),
+    ipcRenderer.invoke('ai:summarize', { mode, source  }),
   ingest: () =>
     ipcRenderer.invoke('ai:ingest'),
   attentive: () =>

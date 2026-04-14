@@ -10,3 +10,4 @@ torchvision torchaudio
 opencv-python
 tensorflow
 numpy
+pip install langchain langchain-community langchain-chroma

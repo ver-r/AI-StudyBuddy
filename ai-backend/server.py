@@ -46,7 +46,7 @@ class DoubtRequest(BaseModel):
 
 class SummaryRequest(BaseModel):
     mode: str = "Detailed"
-
+    source: Optional[str] = None
 
 class IngestRequest(BaseModel):
     path: str
@@ -56,9 +56,9 @@ class AnalysticsRequest(BaseModel):
     quiz_history:List[dict]
     emotion_history:List[dict]
 
-def run_summary(job_id: str, mode: str):
+def run_summary(job_id: str, mode: str, source: str):
     try:
-        result = summarize_notes(mode)
+        result = summarize_notes(mode, source)
         jobs[job_id] = {"status": "done", "result": result}
     except Exception as e:
         jobs[job_id] = {"status": "error", "result": str(e)}
@@ -116,7 +116,7 @@ def summarize_start(req: SummaryRequest):
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "processing", "result": ""}
 
-    t = threading.Thread(target=run_summary, args=(job_id, mode))
+    t = threading.Thread(target=run_summary, args=(job_id, mode, req.source))
     t.start()
 
     return {"ok": True, "job_id": job_id}

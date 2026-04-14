@@ -5,7 +5,7 @@ import json
 import random
 import hashlib
 from typing import List, Optional
-
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 
 # Chroma + embeddings
@@ -39,6 +39,14 @@ from langchain_community.document_loaders import PyPDFLoader
 import os
 
 # ... existing GROQ / embeddings / vector_store setup ...
+def clean_text(text: str) -> str:
+    # fix spaced characters like "J o i n"
+    text = re.sub(r'(\b\w\b\s)+\w\b', lambda m: m.group(0).replace(" ", ""), text)
+    
+    # remove extra spaces
+    text = re.sub(r'\s+', ' ', text)
+
+    return text.strip()
 
 def ingest_pdf(path: str) -> int:
     if not os.path.exists(path):
@@ -46,14 +54,20 @@ def ingest_pdf(path: str) -> int:
 
     loader = PyPDFLoader(path)
     docs = loader.load()
+    splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,
+    chunk_overlap=100
+    )
 
+    docs = splitter.split_documents(docs)
     added_count = 0
-
+    print("Loaded pages:", len(docs))
     for i, d in enumerate(docs):
-        text = d.page_content.strip()
+        
+        text = clean_text(d.page_content)
         if not text:
             continue
-
+        print(f"Adding chunk {i}, length:", len(text))
         doc_hash = hash_text(text)
 
         # If hash exists → skip
@@ -160,6 +174,9 @@ def fetch_all_documents_from_chroma() -> List[str]:
 def retrieve_context_for_topic(topic: str, k: int = 3) -> List[str]:
     try:
         docs = vector_store.similarity_search(topic, k=k)
+        print("Retrieved docs:", len(docs))
+        for d in docs:
+            print(d.page_content[:100])
         return [d.page_content for d in docs]
     except Exception:
         return []
@@ -170,7 +187,9 @@ def generate_question_rag(topic: str, difficulty: str, used_questions_texts: Lis
         used_questions_texts = []
 
     docs = retrieve_context_for_topic(topic, k=6)
-    context = "\n\n".join(docs) if docs else ""
+    if not docs:
+        return ""
+    context = "\n\n".join(docs)
 
     difficulty_instruction = {
         "Easy":   "Create a simple recall-based MCQ about a concrete fact. Keep wording simple.",
@@ -324,9 +343,14 @@ Answer in 2-4 sentences and, when helpful, give one brief supporting detail or e
     return safe_groq(messages=messages, context=context, temperature=0.2, max_completion_tokens=512)
 
 # --------- SUMMARIZER ----------
-def summarize_notes(mode: str = "Detailed") -> str:
-    docs_texts = fetch_all_documents_from_chroma()
-    
+def summarize_notes(mode: str = "Detailed", source: str = None) -> str:
+    coll = vector_store._collection
+
+    if source:
+        data = coll.get(where={"source": source}, include=["documents"])
+        docs_texts = data.get("documents", [])
+    else:
+        docs_texts = fetch_all_documents_from_chroma()
     if not docs_texts:
         return "No notes found in the database."
     if mode.lower().startswith("brief"):
